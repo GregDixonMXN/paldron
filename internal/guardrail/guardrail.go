@@ -9,13 +9,13 @@ import (
 	"strings"
 	"sync"
 
-		"guard/internal/models"
+		"guard/internal/schema"
 )
 
 type Guard struct {
 	cfg                        SecurityConfig
 	mu                         sync.RWMutex
-	schemas                    map[string]models.JSONSchema
+	schemas                    map[string]schema.JSONSchema
 	isolatedExecutionAvailable bool
 }
 
@@ -46,31 +46,31 @@ func (g *Guard) hasIsolatedExecution() bool {
 func New(cfg SecurityConfig) *Guard {
 	return &Guard{
 		cfg:     cfg,
-		schemas: make(map[string]models.JSONSchema),
+		schemas: make(map[string]schema.JSONSchema),
 	}
 }
 
 // RegisterSchema stores a legacy argument schema for validation. New code
 // should register the ToolDefinition so typed schemas do not need to be
 // serialized and parsed again.
-func (g *Guard) RegisterSchema(name, schema string) {
-	g.RegisterJSONSchema(name, models.ParseLegacyArgsSchema(schema))
+func (g *Guard) RegisterSchema(name, legacy string) {
+	g.RegisterJSONSchema(name, schema.ParseLegacyArgsSchema(legacy))
 }
 
 // RegisterDefinition stores a tool's canonical argument contract.
-func (g *Guard) RegisterDefinition(def models.ToolDefinition) {
+func (g *Guard) RegisterDefinition(def schema.ToolDefinition) {
 	g.RegisterJSONSchema(def.Name, def.CanonicalSchema())
 }
 
 // RegisterJSONSchema stores an explicit argument contract.
-func (g *Guard) RegisterJSONSchema(name string, schema models.JSONSchema) {
+func (g *Guard) RegisterJSONSchema(name string, sch schema.JSONSchema) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	g.schemas[name] = schema.Canonical()
+	g.schemas[name] = sch.Canonical()
 }
 
 // Check validates a tool call. Returns nil if allowed.
-func (g *Guard) Check(call *models.ToolCall) error {
+func (g *Guard) Check(call *schema.ToolCall) error {
 	if call == nil {
 		return fmt.Errorf("tool call is nil")
 	}
@@ -87,10 +87,10 @@ func (g *Guard) Check(call *models.ToolCall) error {
 
 	// Schema validation: check required args are present
 	g.mu.RLock()
-	schema, ok := g.schemas[call.Name]
+	sch, ok := g.schemas[call.Name]
 	g.mu.RUnlock()
 	if ok {
-		if err := g.validateSchema(call, schema); err != nil {
+		if err := g.validateSchema(call, sch); err != nil {
 			return err
 		}
 	}
@@ -135,7 +135,7 @@ func (g *Guard) ToolAvailable(name string) bool {
 	}
 }
 
-func (g *Guard) checkNetworkPolicy(call *models.ToolCall) error {
+func (g *Guard) checkNetworkPolicy(call *schema.ToolCall) error {
 	if g.cfg.AllowNetwork {
 		return nil
 	}
@@ -166,7 +166,7 @@ func (g *Guard) checkNetworkPolicy(call *models.ToolCall) error {
 	return nil
 }
 
-func (g *Guard) validateToolSemantics(call *models.ToolCall) error {
+func (g *Guard) validateToolSemantics(call *schema.ToolCall) error {
 	switch call.Name {
 	case "write_file", "edit_file", "read_file":
 		path, _ := call.Args["path"].(string)
@@ -200,12 +200,12 @@ func (g *Guard) validateToolSemantics(call *models.ToolCall) error {
 	return nil
 }
 
-func (g *Guard) validateSchema(call *models.ToolCall, schema models.JSONSchema) error {
-	return validateObject(call.Name, "", call.Args, schema.Canonical())
+func (g *Guard) validateSchema(call *schema.ToolCall, sch schema.JSONSchema) error {
+	return validateObject(call.Name, "", call.Args, sch.Canonical())
 }
 
-func validateObject(toolName, path string, value map[string]interface{}, schema models.JSONSchema) error {
-	for _, key := range schema.Required {
+func validateObject(toolName, path string, value map[string]interface{}, sch schema.JSONSchema) error {
+	for _, key := range sch.Required {
 		if _, exists := value[key]; !exists {
 			return fmt.Errorf("missing required argument '%s' for tool '%s'", joinArgumentPath(path, key), toolName)
 		}
@@ -217,9 +217,9 @@ func validateObject(toolName, path string, value map[string]interface{}, schema 
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		property, exists := schema.Properties[key]
+		property, exists := sch.Properties[key]
 		if !exists {
-			if schema.AdditionalProperties != nil && !*schema.AdditionalProperties {
+			if sch.AdditionalProperties != nil && !*sch.AdditionalProperties {
 				return fmt.Errorf("unknown argument '%s' for tool '%s'", joinArgumentPath(path, key), toolName)
 			}
 			continue
@@ -231,15 +231,15 @@ func validateObject(toolName, path string, value map[string]interface{}, schema 
 	return nil
 }
 
-func validateJSONValue(toolName, path string, value interface{}, schema models.JSONSchema) error {
-	if len(schema.Enum) > 0 {
+func validateJSONValue(toolName, path string, value interface{}, sch schema.JSONSchema) error {
+	if len(sch.Enum) > 0 {
 		text, ok := value.(string)
-		if !ok || !containsString(schema.Enum, text) {
-			return fmt.Errorf("argument '%s' for tool '%s' must be one of %v", path, toolName, schema.Enum)
+		if !ok || !containsString(sch.Enum, text) {
+			return fmt.Errorf("argument '%s' for tool '%s' must be one of %v", path, toolName, sch.Enum)
 		}
 	}
 
-	switch schema.Type {
+	switch sch.Type {
 	case "", "any":
 		return nil
 	case "string":
@@ -250,14 +250,14 @@ func validateJSONValue(toolName, path string, value interface{}, schema models.J
 		if !isInteger(value) {
 			return schemaTypeError(toolName, path, "an integer")
 		}
-		if err := validateNumberBounds(toolName, path, value, schema); err != nil {
+		if err := validateNumberBounds(toolName, path, value, sch); err != nil {
 			return err
 		}
 	case "number":
 		if !isNumber(value) {
 			return schemaTypeError(toolName, path, "a number")
 		}
-		if err := validateNumberBounds(toolName, path, value, schema); err != nil {
+		if err := validateNumberBounds(toolName, path, value, sch); err != nil {
 			return err
 		}
 	case "boolean":
@@ -269,7 +269,7 @@ func validateJSONValue(toolName, path string, value interface{}, schema models.J
 		if !ok {
 			return schemaTypeError(toolName, path, "an object")
 		}
-		if err := validateObject(toolName, path, object, schema); err != nil {
+		if err := validateObject(toolName, path, object, sch); err != nil {
 			return err
 		}
 	case "array":
@@ -277,16 +277,16 @@ func validateJSONValue(toolName, path string, value interface{}, schema models.J
 		if !array.IsValid() || (array.Kind() != reflect.Array && array.Kind() != reflect.Slice) {
 			return schemaTypeError(toolName, path, "an array")
 		}
-		if schema.Items != nil {
+		if sch.Items != nil {
 			for i := 0; i < array.Len(); i++ {
 				itemPath := fmt.Sprintf("%s[%d]", path, i)
-				if err := validateJSONValue(toolName, itemPath, array.Index(i).Interface(), *schema.Items); err != nil {
+				if err := validateJSONValue(toolName, itemPath, array.Index(i).Interface(), *sch.Items); err != nil {
 					return err
 				}
 			}
 		}
 	default:
-		return fmt.Errorf("argument '%s' for tool '%s' has unsupported schema type %q", path, toolName, schema.Type)
+		return fmt.Errorf("argument '%s' for tool '%s' has unsupported schema type %q", path, toolName, sch.Type)
 	}
 	return nil
 }
@@ -328,16 +328,16 @@ func isNumber(value interface{}) bool {
 	return ok
 }
 
-func validateNumberBounds(toolName, path string, value interface{}, schema models.JSONSchema) error {
+func validateNumberBounds(toolName, path string, value interface{}, sch schema.JSONSchema) error {
 	number, ok := numberValue(value)
 	if !ok {
 		return nil
 	}
-	if schema.Minimum != nil && number < *schema.Minimum {
-		return fmt.Errorf("argument '%s' for tool '%s' must be at least %g", path, toolName, *schema.Minimum)
+	if sch.Minimum != nil && number < *sch.Minimum {
+		return fmt.Errorf("argument '%s' for tool '%s' must be at least %g", path, toolName, *sch.Minimum)
 	}
-	if schema.Maximum != nil && number > *schema.Maximum {
-		return fmt.Errorf("argument '%s' for tool '%s' must be at most %g", path, toolName, *schema.Maximum)
+	if sch.Maximum != nil && number > *sch.Maximum {
+		return fmt.Errorf("argument '%s' for tool '%s' must be at most %g", path, toolName, *sch.Maximum)
 	}
 	return nil
 }

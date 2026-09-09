@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	
-	"guard/internal/models"
+	"guard/internal/schema"
 )
 
 func TestNetworkPolicyFailsClosedWhenGuardrailsDisabled(t *testing.T) {
@@ -17,16 +17,16 @@ func TestNetworkPolicyFailsClosedWhenGuardrailsDisabled(t *testing.T) {
 
 	tests := []struct {
 		name string
-		call *models.ToolCall
+		call *schema.ToolCall
 	}{
-		{name: "web search", call: &models.ToolCall{Name: "web_search", Args: map[string]interface{}{"query": "test"}}},
-		{name: "web scrape", call: &models.ToolCall{Name: "web_scrape", Args: map[string]interface{}{"url": "https://example.com"}}},
-		{name: "wolfram", call: &models.ToolCall{Name: "wolfram", Args: map[string]interface{}{"query": "1+1"}}},
-		{name: "cloud delegation", call: &models.ToolCall{Name: "ask_cloud_model", Args: map[string]interface{}{"provider": "claude", "prompt": "hello"}}},
-		{name: "cloud vision", call: &models.ToolCall{Name: "analyze_image", Args: map[string]interface{}{"image_path": "/tmp/image.png"}}},
-		{name: "arbitrary execution", call: &models.ToolCall{Name: "execute_code", Args: map[string]interface{}{"command": "python3 script.py", "dir": "/tmp"}}},
-		{name: "git push", call: &models.ToolCall{Name: "git_ops", Args: map[string]interface{}{"action": " PUSH ", "cwd": "/tmp"}}},
-		{name: "git helper path", call: &models.ToolCall{Name: "git_ops", Args: map[string]interface{}{"action": "status", "cwd": "/tmp"}}},
+		{name: "web search", call: &schema.ToolCall{Name: "web_search", Args: map[string]interface{}{"query": "test"}}},
+		{name: "web scrape", call: &schema.ToolCall{Name: "web_scrape", Args: map[string]interface{}{"url": "https://example.com"}}},
+		{name: "wolfram", call: &schema.ToolCall{Name: "wolfram", Args: map[string]interface{}{"query": "1+1"}}},
+		{name: "cloud delegation", call: &schema.ToolCall{Name: "ask_cloud_model", Args: map[string]interface{}{"provider": "claude", "prompt": "hello"}}},
+		{name: "cloud vision", call: &schema.ToolCall{Name: "analyze_image", Args: map[string]interface{}{"image_path": "/tmp/image.png"}}},
+		{name: "arbitrary execution", call: &schema.ToolCall{Name: "execute_code", Args: map[string]interface{}{"command": "python3 script.py", "dir": "/tmp"}}},
+		{name: "git push", call: &schema.ToolCall{Name: "git_ops", Args: map[string]interface{}{"action": " PUSH ", "cwd": "/tmp"}}},
+		{name: "git helper path", call: &schema.ToolCall{Name: "git_ops", Args: map[string]interface{}{"action": "status", "cwd": "/tmp"}}},
 	}
 
 	for _, tt := range tests {
@@ -44,7 +44,7 @@ func TestNetworkPolicyAllowsLocalOnlyTools(t *testing.T) {
 		AllowNetwork:     false,
 	})
 
-	for _, call := range []*models.ToolCall{
+	for _, call := range []*schema.ToolCall{
 		{Name: "read_file", Args: map[string]interface{}{"path": "/tmp/file"}},
 		{Name: "write_file", Args: map[string]interface{}{"path": "/tmp/file", "content": "safe"}},
 	} {
@@ -73,7 +73,7 @@ func TestNetworkToolsAreHiddenWhenDisabled(t *testing.T) {
 
 func TestNetworkPolicyAllowsExecuteCodeOnlyWithEnforcedIsolation(t *testing.T) {
 	g := New(SecurityConfig{EnableGuardrails: false, AllowNetwork: false})
-	call := &models.ToolCall{
+	call := &schema.ToolCall{
 		Name: "execute_code",
 		Args: map[string]interface{}{"command": "go test ./...", "dir": "/tmp"},
 	}
@@ -91,14 +91,14 @@ func TestNetworkPolicyAllowsExecuteCodeOnlyWithEnforcedIsolation(t *testing.T) {
 	if !g.ToolAvailable("execute_code") {
 		t.Fatal("isolated execute_code remained hidden")
 	}
-	gitStatus := &models.ToolCall{Name: "git_ops", Args: map[string]interface{}{"action": "status", "cwd": "/tmp"}}
+	gitStatus := &schema.ToolCall{Name: "git_ops", Args: map[string]interface{}{"action": "status", "cwd": "/tmp"}}
 	if err := g.Check(gitStatus); err != nil {
 		t.Fatalf("isolated local git action was rejected: %v", err)
 	}
 	if !g.ToolAvailable("git_ops") {
 		t.Fatal("isolated git_ops remained hidden")
 	}
-	gitPush := &models.ToolCall{Name: "git_ops", Args: map[string]interface{}{"action": "push", "cwd": "/tmp"}}
+	gitPush := &schema.ToolCall{Name: "git_ops", Args: map[string]interface{}{"action": "push", "cwd": "/tmp"}}
 	if err := g.Check(gitPush); err == nil {
 		t.Fatal("git push was allowed with networking disabled")
 	}
@@ -106,7 +106,7 @@ func TestNetworkPolicyAllowsExecuteCodeOnlyWithEnforcedIsolation(t *testing.T) {
 
 func TestConcurrentSchemaRegistrationAndCheck(t *testing.T) {
 	g := New(SecurityConfig{EnableGuardrails: true, AllowNetwork: true})
-	call := &models.ToolCall{Name: "read_file", Args: map[string]interface{}{"path": "/tmp/file"}}
+	call := &schema.ToolCall{Name: "read_file", Args: map[string]interface{}{"path": "/tmp/file"}}
 
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
@@ -136,7 +136,7 @@ func TestSchemaValidationRejectsWrongArgumentTypes(t *testing.T) {
 	g := New(SecurityConfig{EnableGuardrails: true, AllowNetwork: true})
 	g.RegisterSchema("example", `{"path":"string","limit":"int (optional)","enabled":"bool (optional)"}`)
 
-	valid := &models.ToolCall{Name: "example", Args: map[string]interface{}{
+	valid := &schema.ToolCall{Name: "example", Args: map[string]interface{}{
 		"path":    "file.txt",
 		"limit":   float64(5),
 		"enabled": true,
@@ -159,7 +159,7 @@ func TestSchemaValidationRejectsWrongArgumentTypes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			args := map[string]interface{}{"path": "file.txt"}
 			args[tt.key] = tt.value
-			if err := g.Check(&models.ToolCall{Name: "example", Args: args}); err == nil {
+			if err := g.Check(&schema.ToolCall{Name: "example", Args: args}); err == nil {
 				t.Fatalf("%s=%#v was accepted", tt.key, tt.value)
 			}
 		})
@@ -175,7 +175,7 @@ func TestTypedSchemaValidationRequiredOptionalEnumIntegerAndNested(t *testing.T)
 	minTemperature := float64(0)
 	maxTemperature := float64(2)
 	maxTokens := float64(8192)
-	g.RegisterJSONSchema("deploy", *models.ObjectSchema(map[string]models.JSONSchema{
+	g.RegisterJSONSchema("deploy", *schema.ObjectSchema(map[string]schema.JSONSchema{
 		"provider": {
 			Type: "string",
 			Enum: []string{"local", "openai"},
@@ -193,11 +193,11 @@ func TestTypedSchemaValidationRequiredOptionalEnumIntegerAndNested(t *testing.T)
 		"note": {Type: "string"},
 		"config": {
 			Type: "object",
-			Properties: map[string]models.JSONSchema{
+			Properties: map[string]schema.JSONSchema{
 				"enabled": {Type: "boolean"},
 				"limits": {
 					Type: "object",
-					Properties: map[string]models.JSONSchema{
+					Properties: map[string]schema.JSONSchema{
 						"tokens": {Type: "integer", Maximum: &maxTokens},
 					},
 					Required: []string{"tokens"},
@@ -207,7 +207,7 @@ func TestTypedSchemaValidationRequiredOptionalEnumIntegerAndNested(t *testing.T)
 		},
 	}, "provider", "retries", "config"))
 
-	valid := &models.ToolCall{Name: "deploy", Args: map[string]interface{}{
+	valid := &schema.ToolCall{Name: "deploy", Args: map[string]interface{}{
 		"provider":    "openai",
 		"retries":     float64(2),
 		"temperature": 0.7,
@@ -283,7 +283,7 @@ func TestTypedSchemaValidationRequiredOptionalEnumIntegerAndNested(t *testing.T)
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := g.Check(&models.ToolCall{Name: "deploy", Args: tt.args})
+			err := g.Check(&schema.ToolCall{Name: "deploy", Args: tt.args})
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("Check() error = %v, want substring %q", err, tt.want)
 			}

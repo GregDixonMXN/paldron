@@ -1,4 +1,4 @@
-package models
+package schema
 
 // ToolDefinition and ToolCall are the agent-facing contracts, extracted from
 // Reeve's pkg/models without the conversation/LLM types (those stay out).

@@ -1,0 +1,18 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  go:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+      - run: gofmt -l .
+      - run: go vet ./...
+      - run: go test -count=1 -race ./...
+      - run: go build -o guard ./cmd/guard

@@ -22,38 +22,38 @@ import (
 	
 	"guard/internal/guardrail"
 	"guard/internal/sandbox"
-	"guard/internal/models"
+	"guard/internal/schema"
 )
 
 // builtinDefs states the file/code tool contracts (names, args, descriptions).
 // without importing the registry (cloud/memory entanglement stays out).
-func builtinDefs() map[string]models.ToolDefinition {
-	mk := func(name, desc string, params map[string]models.JSONSchema, required ...string) models.ToolDefinition {
-		return models.ToolDefinition{
+func builtinDefs() map[string]schema.ToolDefinition {
+	mk := func(name, desc string, params map[string]schema.JSONSchema, required ...string) schema.ToolDefinition {
+		return schema.ToolDefinition{
 			Name:        name,
 			Description: desc,
-			Parameters:  models.ObjectSchema(params, required...),
+			Parameters:  schema.ObjectSchema(params, required...),
 		}
 	}
-	str := func(desc string) models.JSONSchema { return models.JSONSchema{Type: "string", Description: desc} }
-	return map[string]models.ToolDefinition{
+	str := func(desc string) schema.JSONSchema { return schema.JSONSchema{Type: "string", Description: desc} }
+	return map[string]schema.ToolDefinition{
 		"read_file": mk("read_file", "Read file contents from an allowed directory",
-			map[string]models.JSONSchema{"path": str("Absolute path to the file")}, "path"),
+			map[string]schema.JSONSchema{"path": str("Absolute path to the file")}, "path"),
 		"write_file": mk("write_file", "Write content to a file in an allowed directory",
-			map[string]models.JSONSchema{
+			map[string]schema.JSONSchema{
 				"path":    str("Absolute path to the file"),
 				"content": str("Complete content to write"),
 			}, "path", "content"),
 		"edit_file": mk("edit_file", "Replace the first occurrence of old_text with new_text in a file",
-			map[string]models.JSONSchema{
+			map[string]schema.JSONSchema{
 				"path":     str("Absolute path to the file"),
 				"old_text": str("Exact text to replace"),
 				"new_text": str("Replacement text"),
 			}, "path", "old_text", "new_text"),
 		"list_dir": mk("list_dir", "List files and directories at a path",
-			map[string]models.JSONSchema{"path": str("Absolute directory path")}, "path"),
+			map[string]schema.JSONSchema{"path": str("Absolute directory path")}, "path"),
 		"execute_code": mk("execute_code", "Execute a single binary command in a sandboxed directory. Shell chaining, pipes, redirects, and subshells are blocked.",
-			map[string]models.JSONSchema{
+			map[string]schema.JSONSchema{
 				"command": str("Single command with no shell operators"),
 				"dir":     str("Absolute working directory"),
 			}, "command", "dir"),
@@ -90,7 +90,7 @@ func runCheck(p *Policy, toolName, rawArgs string) int {
 	if args == nil {
 		args = map[string]any{}
 	}
-	call := &models.ToolCall{Name: toolName, Args: args}
+	call := &schema.ToolCall{Name: toolName, Args: args}
 	if err := newGuard(p).Check(call); err != nil {
 		return deny("%s", err)
 	}
@@ -260,8 +260,17 @@ func usage() int {
 
   guard check --policy p.toml -- toolname '{"json":"args"}'
   guard exec  --policy p.toml -- argv...
-  guard schema --tool name`)
+  guard schema --tool name
+  guard version`)
 	return 1
+}
+
+// version is baked at release time: go build -ldflags "-X main.version=vX.Y.Z".
+var version = "dev"
+
+func runVersion() int {
+	fmt.Printf("guard %s\n", version)
+	return 0
 }
 
 func main() {
@@ -332,6 +341,8 @@ func main() {
 		os.Exit(runCheck(policy, rest[0], raw))
 	case "exec":
 		os.Exit(runExec(policy, rest))
+	case "version":
+		os.Exit(runVersion())
 	case "schema":
 		name := ""
 		for i := 0; i < len(rest); i++ {

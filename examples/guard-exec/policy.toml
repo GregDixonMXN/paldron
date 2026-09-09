@@ -1,0 +1,6 @@
+allow_paths = ["src/"]
+deny_globs = [".env", ".env.*", "*.pem", "**/secrets/**"]
+allow_network = false
+allow_binaries = ["python3"]
+require_os_isolation = true
+timeout_sec = 30

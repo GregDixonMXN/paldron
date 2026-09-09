@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-		"guard/internal/schema"
+	"guard/internal/schema"
 )
 
 type Guard struct {

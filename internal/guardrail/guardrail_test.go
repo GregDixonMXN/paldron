@@ -5,7 +5,6 @@ import (
 	"sync"
 	"testing"
 
-	
 	"guard/internal/schema"
 )
 

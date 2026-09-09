@@ -12,7 +12,7 @@ jobs:
         with:
           go-version: "1.23"
           cache: true
-      - run: gofmt -l .
+      - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -count=1 -race ./...
       - run: go build -o guard ./cmd/guard

@@ -1,12 +1,12 @@
-// Package main implements the guard CLI: policy decisions over tool calls
+// Package main implements the paldron CLI: policy decisions over tool calls
 // and sandboxed command execution.
 //
-// guard check --policy p.toml -- toolname '{"json":"args"}'
-// guard exec  --policy p.toml -- argv...
-// guard schema --tool name
+// paldron check --policy p.toml -- toolname '{"json":"args"}'
+// paldron exec  --policy p.toml -- argv...
+// paldron schema --tool name
 //
 // Exit 0 allow, 2 policy deny, 1 sandbox/setup broken (same numbers as
-// annalist gate). Annalist records what happened; guard decides whether
+// annalist gate). Annalist records what happened; paldron decides whether
 // it may run.
 package main
 
@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"guard/internal/guardrail"
-	"guard/internal/sandbox"
-	"guard/internal/schema"
+	"github.com/GregDixonMXN/paldron/internal/paldron"
+	"github.com/GregDixonMXN/paldron/internal/sandbox"
+	"github.com/GregDixonMXN/paldron/internal/schema"
 )
 
 // builtinDefs states the file/code tool contracts (names, args, descriptions).
@@ -59,8 +59,8 @@ func builtinDefs() map[string]schema.ToolDefinition {
 	}
 }
 
-func newGuard(p *Policy) *guardrail.Guard {
-	g := guardrail.New(guardrail.SecurityConfig{
+func newPaldron(p *Policy) *paldron.Paldron {
+	g := paldron.New(paldron.SecurityConfig{
 		EnableGuardrails: true,
 		AllowNetwork:     p.AllowNetwork,
 	})
@@ -72,12 +72,12 @@ func newGuard(p *Policy) *guardrail.Guard {
 }
 
 func fail(msg string, args ...any) int {
-	fmt.Fprintf(os.Stderr, "guard: "+msg+"\n", args...)
+	fmt.Fprintf(os.Stderr, "paldron: "+msg+"\n", args...)
 	return 1
 }
 
 func deny(msg string, args ...any) int {
-	fmt.Fprintf(os.Stderr, "guard: deny: "+msg+"\n", args...)
+	fmt.Fprintf(os.Stderr, "paldron: deny: "+msg+"\n", args...)
 	return 2
 }
 
@@ -90,7 +90,7 @@ func runCheck(p *Policy, toolName, rawArgs string) int {
 		args = map[string]any{}
 	}
 	call := &schema.ToolCall{Name: toolName, Args: args}
-	if err := newGuard(p).Check(call); err != nil {
+	if err := newPaldron(p).Check(call); err != nil {
 		return deny("%s", err)
 	}
 	cwd, err := os.Getwd()
@@ -107,13 +107,13 @@ func runCheck(p *Policy, toolName, rawArgs string) int {
 		}
 		_ = key
 	}
-	fmt.Printf("guard: allow %s\n", toolName)
+	fmt.Printf("paldron: allow %s\n", toolName)
 	return 0
 }
 
 func runExec(p *Policy, argv []string) int {
 	if len(argv) == 0 {
-		return fail("usage: guard exec --policy p.toml -- argv...")
+		return fail("usage: paldron exec --policy p.toml -- argv...")
 	}
 	bin := filepath.Base(argv[0])
 	if len(p.AllowBinaries) > 0 && !containsFold(p.AllowBinaries, bin) {
@@ -255,12 +255,12 @@ func intOr(v, def int) int {
 }
 
 func usage() int {
-	fmt.Fprintln(os.Stderr, `guard — policy gate and sandboxed exec (exits 0 allow, 2 deny, 1 broken)
+	fmt.Fprintln(os.Stderr, `paldron — policy gate and sandboxed exec (exits 0 allow, 2 deny, 1 broken)
 
-  guard check --policy p.toml -- toolname '{"json":"args"}'
-  guard exec  --policy p.toml -- argv...
-  guard schema --tool name
-  guard version`)
+  paldron check --policy p.toml -- toolname '{"json":"args"}'
+  paldron exec  --policy p.toml -- argv...
+  paldron schema --tool name
+  paldron version`)
 	return 1
 }
 
@@ -268,7 +268,7 @@ func usage() int {
 var version = "dev"
 
 func runVersion() int {
-	fmt.Printf("guard %s\n", version)
+	fmt.Printf("paldron %s\n", version)
 	return 0
 }
 
@@ -276,7 +276,7 @@ func main() {
 	// Sandbox helper re-exec: restricted child, never the CLI.
 	if sandbox.IsSandboxHelperInvocation(os.Args) {
 		if err := sandbox.RunSandboxHelper(os.Args); err != nil {
-			fmt.Fprintln(os.Stderr, "guard helper:", err)
+			fmt.Fprintln(os.Stderr, "paldron helper:", err)
 			os.Exit(1)
 		}
 		return
@@ -297,7 +297,7 @@ func main() {
 		if a == "--policy" {
 			i++
 			if i >= len(args) {
-				fmt.Fprintln(os.Stderr, "guard: --policy needs a file")
+				fmt.Fprintln(os.Stderr, "paldron: --policy needs a file")
 				os.Exit(1)
 			}
 			policyPath = args[i]
@@ -310,7 +310,7 @@ func main() {
 		if cmd == "schema" && a == "--tool" {
 			i++
 			if i >= len(args) {
-				fmt.Fprintln(os.Stderr, "guard: --tool needs a name")
+				fmt.Fprintln(os.Stderr, "paldron: --tool needs a name")
 				os.Exit(1)
 			}
 			rest = append(rest, a, args[i])
@@ -323,14 +323,14 @@ func main() {
 		var err error
 		policy, err = LoadPolicy(policyPath)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "guard:", err)
+			fmt.Fprintln(os.Stderr, "paldron:", err)
 			os.Exit(1)
 		}
 	}
 	switch cmd {
 	case "check":
 		if len(rest) < 1 {
-			fmt.Fprintln(os.Stderr, "guard: usage: guard check --policy p.toml -- toolname '{\"args\"}'")
+			fmt.Fprintln(os.Stderr, "paldron: usage: paldron check --policy p.toml -- toolname '{\"args\"}'")
 			os.Exit(1)
 		}
 		raw := "{}"
@@ -350,7 +350,7 @@ func main() {
 			}
 		}
 		if name == "" {
-			fmt.Fprintln(os.Stderr, "guard: usage: guard schema --tool name")
+			fmt.Fprintln(os.Stderr, "paldron: usage: paldron schema --tool name")
 			os.Exit(1)
 		}
 		os.Exit(runSchema(name))

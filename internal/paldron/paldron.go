@@ -1,4 +1,4 @@
-package guardrail
+package paldron
 
 import (
 	"fmt"
@@ -9,17 +9,17 @@ import (
 	"strings"
 	"sync"
 
-	"guard/internal/schema"
+	"github.com/GregDixonMXN/paldron/internal/schema"
 )
 
-type Guard struct {
+type Paldron struct {
 	cfg                        SecurityConfig
 	mu                         sync.RWMutex
 	schemas                    map[string]schema.JSONSchema
 	isolatedExecutionAvailable bool
 }
 
-// SecurityConfig is the enforcement subset guard needs: network boundary,
+// SecurityConfig is the enforcement subset paldron needs: network boundary,
 // blocked patterns, and the master switch. It mirrors the same-named Reeve
 // fields so policy semantics stay identical across the split.
 type SecurityConfig struct {
@@ -31,20 +31,20 @@ type SecurityConfig struct {
 // SetIsolatedExecutionAvailable records whether execute_code is backed by an
 // enforceable OS filesystem/network boundary. Startup sets this only after the
 // host capability probe succeeds.
-func (g *Guard) SetIsolatedExecutionAvailable(available bool) {
+func (g *Paldron) SetIsolatedExecutionAvailable(available bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.isolatedExecutionAvailable = available
 }
 
-func (g *Guard) hasIsolatedExecution() bool {
+func (g *Paldron) hasIsolatedExecution() bool {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	return g.isolatedExecutionAvailable
 }
 
-func New(cfg SecurityConfig) *Guard {
-	return &Guard{
+func New(cfg SecurityConfig) *Paldron {
+	return &Paldron{
 		cfg:     cfg,
 		schemas: make(map[string]schema.JSONSchema),
 	}
@@ -53,30 +53,30 @@ func New(cfg SecurityConfig) *Guard {
 // RegisterSchema stores a legacy argument schema for validation. New code
 // should register the ToolDefinition so typed schemas do not need to be
 // serialized and parsed again.
-func (g *Guard) RegisterSchema(name, legacy string) {
+func (g *Paldron) RegisterSchema(name, legacy string) {
 	g.RegisterJSONSchema(name, schema.ParseLegacyArgsSchema(legacy))
 }
 
 // RegisterDefinition stores a tool's canonical argument contract.
-func (g *Guard) RegisterDefinition(def schema.ToolDefinition) {
+func (g *Paldron) RegisterDefinition(def schema.ToolDefinition) {
 	g.RegisterJSONSchema(def.Name, def.CanonicalSchema())
 }
 
 // RegisterJSONSchema stores an explicit argument contract.
-func (g *Guard) RegisterJSONSchema(name string, sch schema.JSONSchema) {
+func (g *Paldron) RegisterJSONSchema(name string, sch schema.JSONSchema) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.schemas[name] = sch.Canonical()
 }
 
 // Check validates a tool call. Returns nil if allowed.
-func (g *Guard) Check(call *schema.ToolCall) error {
+func (g *Paldron) Check(call *schema.ToolCall) error {
 	if call == nil {
 		return fmt.Errorf("tool call is nil")
 	}
 
 	// Network policy is a capability boundary, not an optional content
-	// guardrail. Enforce it even when heuristic guardrails are disabled.
+	// paldron. Enforce it even when heuristic guardrails are disabled.
 	if err := g.checkNetworkPolicy(call); err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (g *Guard) Check(call *schema.ToolCall) error {
 
 // ToolAvailable reports whether a tool can be exposed under the configured
 // network policy.
-func (g *Guard) ToolAvailable(name string) bool {
+func (g *Paldron) ToolAvailable(name string) bool {
 	if g.cfg.AllowNetwork {
 		return true
 	}
@@ -135,7 +135,7 @@ func (g *Guard) ToolAvailable(name string) bool {
 	}
 }
 
-func (g *Guard) checkNetworkPolicy(call *schema.ToolCall) error {
+func (g *Paldron) checkNetworkPolicy(call *schema.ToolCall) error {
 	if g.cfg.AllowNetwork {
 		return nil
 	}
@@ -166,7 +166,7 @@ func (g *Guard) checkNetworkPolicy(call *schema.ToolCall) error {
 	return nil
 }
 
-func (g *Guard) validateToolSemantics(call *schema.ToolCall) error {
+func (g *Paldron) validateToolSemantics(call *schema.ToolCall) error {
 	switch call.Name {
 	case "write_file", "edit_file", "read_file":
 		path, _ := call.Args["path"].(string)
@@ -200,7 +200,7 @@ func (g *Guard) validateToolSemantics(call *schema.ToolCall) error {
 	return nil
 }
 
-func (g *Guard) validateSchema(call *schema.ToolCall, sch schema.JSONSchema) error {
+func (g *Paldron) validateSchema(call *schema.ToolCall, sch schema.JSONSchema) error {
 	return validateObject(call.Name, "", call.Args, sch.Canonical())
 }
 

@@ -6,16 +6,16 @@ import (
 	"path/filepath"
 	"testing"
 
-	"guard/internal/sandbox"
+	"github.com/GregDixonMXN/paldron/internal/sandbox"
 )
 
 // TestMain gives the test binary the same sandbox-helper entry point as
-// the guard binary: under OS isolation the helper re-exec is /proc/self/exe,
+// the paldron binary: under OS isolation the helper re-exec is /proc/self/exe,
 // which during tests is this test binary.
 func TestMain(m *testing.M) {
 	if sandbox.IsSandboxHelperInvocation(os.Args) {
 		if err := sandbox.RunSandboxHelper(os.Args); err != nil {
-			fmt.Fprintln(os.Stderr, "guard helper:", err)
+			fmt.Fprintln(os.Stderr, "paldron helper:", err)
 			os.Exit(1)
 		}
 		os.Exit(0)

@@ -9,9 +9,9 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// Policy is guard's own allow/deny model. Shape mirrors the enforcement
+// Policy is paldron's own allow/deny model. Shape mirrors the enforcement
 // fields of config.SecurityConfig without importing the app config package
-// (split-time: this file moves to the guard module unchanged).
+// (split-time: this file moves to the paldron module unchanged).
 type Policy struct {
 	AllowPaths         []string `toml:"allow_paths"`
 	DenyGlobs          []string `toml:"deny_globs"`

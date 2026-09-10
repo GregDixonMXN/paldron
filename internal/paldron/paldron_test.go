@@ -1,11 +1,11 @@
-package guardrail
+package paldron
 
 import (
 	"strings"
 	"sync"
 	"testing"
 
-	"guard/internal/schema"
+	"github.com/GregDixonMXN/paldron/internal/schema"
 )
 
 func TestNetworkPolicyFailsClosedWhenGuardrailsDisabled(t *testing.T) {

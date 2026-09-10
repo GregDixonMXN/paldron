@@ -16,6 +16,6 @@ jobs:
       - run: go vet ./...
       # Race detector only on the pure packages: the sandbox tests re-exec
       # the test binary under Landlock/rlimits where TSan cannot mmap.
-      - run: go test -count=1 -race ./internal/guardrail/ ./internal/schema/
-      - run: go test -count=1 ./internal/sandbox/ ./cmd/guard/
-      - run: go build -o guard ./cmd/guard
+      - run: go test -count=1 -race ./internal/paldron/ ./internal/schema/
+      - run: go test -count=1 ./internal/sandbox/ ./cmd/paldron/
+      - run: go build -o paldron ./cmd/paldron

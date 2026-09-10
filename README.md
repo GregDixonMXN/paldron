@@ -1,15 +1,15 @@
-# Guard
+# Paldron
 
 **Decide whether it may run.** Policy gate and sandboxed exec for commands
 invoked by coding agents. Exits 0 allow, 2 deny, 1 broken (same numbers as
-`annalist gate`: Annalist records what happened, Guard decides whether it
+`annalist gate`: Annalist records what happened, Paldron decides whether it
 may run).
 
 Linux only. No model, no chat, no cloud.
 
 ```sh
-guard exec --policy policy.toml -- python3 -c 'open(".env","w")'
-# guard: deny: run produced .env (secret)   (exit 2, no model running)
+paldron exec --policy policy.toml -- python3 -c 'open(".env","w")'
+# paldron: deny: run produced .env (secret)   (exit 2, no model running)
 ```
 
 ## Policy
@@ -31,13 +31,13 @@ limits, then flips a successful run to deny if it produced a denied file
 ## Commands
 
 ```sh
-guard check --policy policy.toml -- write_file '{"path":"/abs/src/a.txt","content":"hi"}'
-guard exec  --policy policy.toml -- python3 src/tool.py
-guard schema --tool execute_code
+paldron check --policy policy.toml -- write_file '{"path":"/abs/src/a.txt","content":"hi"}'
+paldron exec  --policy policy.toml -- python3 src/tool.py
+paldron schema --tool execute_code
 ```
 
 ## Build
 
-Requires Go 1.23+. `go test -race ./...`. Extracted from Reeve's
+Requires Go 1.24+. `go test -race ./...`. Extracted from Reeve's
 guardrail + sandbox (see reeve/docs/cut.md); the registry, models,
 memory, and desktop stayed behind.

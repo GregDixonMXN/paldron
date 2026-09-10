@@ -284,6 +284,7 @@ func (s *Sandbox) executeParts(ctx context.Context, policyCommand string, parts 
 		defer os.RemoveAll(tempHome)
 		request := isolationRequest{
 			AllowedDirs:  append(append([]string(nil), isolationRoots...), tempHome),
+			ReadOnlyDirs: readOnlyDependencyCaches(),
 			WorkingDir:   realDir,
 			Command:      parts,
 			AllowNetwork: s.cfg.AllowNetwork,
@@ -303,12 +304,19 @@ func (s *Sandbox) executeParts(ctx context.Context, policyCommand string, parts 
 			"HOME":                tempHome,
 			"TMPDIR":              tempHome,
 			"GOCACHE":             filepath.Join(tempHome, "go-cache"),
-			"CARGO_HOME":          filepath.Join(tempHome, "cargo-home"),
+			"CARGO_HOME":          cargoHome(),
+			"RUSTUP_HOME":         rustupHome(),
 			"XDG_CACHE_HOME":      filepath.Join(tempHome, "xdg-cache"),
 			"NPM_CONFIG_CACHE":    filepath.Join(tempHome, "npm-cache"),
 			"PIP_CACHE_DIR":       filepath.Join(tempHome, "pip-cache"),
 			"PYTHONPYCACHEPREFIX": filepath.Join(tempHome, "python-cache"),
 		})
+		if !s.cfg.AllowNetwork {
+			// No-network policy means builds resolve from cache only.
+			// Without this, cargo tries a registry refresh and dies on
+			// the seccomp socket denial instead of building offline.
+			commandEnv = append(commandEnv, "CARGO_NET_OFFLINE=true")
+		}
 	} else {
 		cmd = exec.CommandContext(execCtx, parts[0], parts[1:]...)
 	}
@@ -465,6 +473,48 @@ func (s *Sandbox) sanitizedEnv() []string {
 		}
 	}
 	return env
+}
+
+// cargoHome resolves the invoking user's real Cargo home from the parent
+// environment (never the sandbox's ephemeral HOME).
+func cargoHome() string {
+	if h := os.Getenv("CARGO_HOME"); h != "" {
+		return h
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".cargo")
+	}
+	return ""
+}
+
+// rustupHome resolves the invoking user's real rustup home the same way.
+func rustupHome() string {
+	if h := os.Getenv("RUSTUP_HOME"); h != "" {
+		return h
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".rustup")
+	}
+	return ""
+}
+
+// readOnlyDependencyCaches lists dependency stores the sandbox may read
+// but never write. Only the cache subdirectories are granted — never the
+// store root — so registry credentials and config stay unreachable even
+// though CARGO_HOME/RUSTUP_HOME point at the real homes.
+func readOnlyDependencyCaches() []string {
+	var dirs []string
+	if reg := filepath.Join(cargoHome(), "registry"); reg != string(filepath.Separator) {
+		if st, err := os.Stat(reg); err == nil && st.IsDir() {
+			dirs = append(dirs, reg)
+		}
+	}
+	if tc := filepath.Join(rustupHome(), "toolchains"); tc != string(filepath.Separator) {
+		if st, err := os.Stat(tc); err == nil && st.IsDir() {
+			dirs = append(dirs, tc)
+		}
+	}
+	return dirs
 }
 
 func withEnvironmentOverrides(env []string, overrides map[string]string) []string {

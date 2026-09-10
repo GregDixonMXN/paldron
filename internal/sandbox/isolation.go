@@ -28,6 +28,7 @@ type isolationResourceLimits struct {
 
 type isolationRequest struct {
 	AllowedDirs    []string                `json:"allowed_dirs"`
+	ReadOnlyDirs   []string                `json:"read_only_dirs"`
 	WorkingDir     string                  `json:"working_dir"`
 	Command        []string                `json:"command"`
 	AllowNetwork   bool                    `json:"allow_network"`

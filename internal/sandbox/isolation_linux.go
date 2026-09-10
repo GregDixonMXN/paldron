@@ -240,6 +240,7 @@ func validateIsolationPaths(request isolationRequest) (isolationRequest, error) 
 		return isolationRequest{}, fmt.Errorf("working directory %q is outside the allowed roots", workingDir)
 	}
 	request.AllowedDirs = allowed
+	request.ReadOnlyDirs = canonicalExistingPaths(request.ReadOnlyDirs)
 	request.WorkingDir = workingDir
 	return request, nil
 }
@@ -273,6 +274,14 @@ func applyLandlock(request isolationRequest, commandPath, invocationPath string)
 	for _, path := range request.AllowedDirs {
 		if err := addLandlockPathRule(rulesetFD, path, filesystemAccess); err != nil {
 			return fmt.Errorf("allow workspace path %s: %w", path, err)
+		}
+	}
+	// Dependency caches (cargo registry, rustup toolchains) are usable
+	// inside the sandbox but never writable there: a compromised build
+	// cannot poison the cache for later unsandboxed builds.
+	for _, path := range request.ReadOnlyDirs {
+		if err := addLandlockPathRule(rulesetFD, path, readonlyAccess); err != nil {
+			return fmt.Errorf("allow read-only path %s: %w", path, err)
 		}
 	}
 	deviceAccess := uint64(unix.LANDLOCK_ACCESS_FS_READ_FILE | unix.LANDLOCK_ACCESS_FS_WRITE_FILE)

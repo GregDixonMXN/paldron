@@ -21,6 +21,13 @@ allow_network = false
 allow_binaries = ["ls", "cat", "python3", "git"]
 require_os_isolation = true
 timeout_sec = 30
+# Resource ceilings (all optional, 0 = default). max_processes counts every
+# task of the invoking user (NPROC semantics), so keep it in the thousands.
+max_processes = 4096   # default 4096
+max_memory_mb = 8192   # default 8192
+max_open_files = 1024  # default 1024
+cpu_time_sec = 60      # default 60
+max_file_size_mb = 1024 # default 1024
 ```
 
 Secrets are denied even with no policy file. Unknown keys are an error.

@@ -19,7 +19,25 @@ type Policy struct {
 	AllowBinaries      []string `toml:"allow_binaries"`
 	RequireOSIsolation bool     `toml:"require_os_isolation"`
 	TimeoutSec         int      `toml:"timeout_sec"`
+	// Resource ceilings (0 = compiled default). max_processes counts ALL
+	// of the invoking user's tasks (NPROC semantics), so it must clear a
+	// busy desktop, not just the sandboxed child: keep it in the thousands.
+	MaxProcesses  int `toml:"max_processes"`
+	MaxMemoryMB   int `toml:"max_memory_mb"`
+	MaxOpenFiles  int `toml:"max_open_files"`
+	CPUTimeSec    int `toml:"cpu_time_sec"`
+	MaxFileSizeMB int `toml:"max_file_size_mb"`
 }
+
+// Compiled resource defaults. Deliberately roomy: the sandbox's job is
+// containment (fs/net/process-visibility), not starving compilers.
+const (
+	defaultMaxProcesses  = 4096
+	defaultMaxMemoryMB   = 8192
+	defaultMaxOpenFiles  = 1024
+	defaultCPUTimeSec    = 60
+	defaultMaxFileSizeMB = 1024
+)
 
 // DefaultSecretGlobs always apply: the recorder-style guarantee that
 // secrets are denied even when no policy file is given.
@@ -32,6 +50,8 @@ func DefaultPolicy() *Policy {
 var knownPolicyKeys = map[string]bool{
 	"allow_paths": true, "deny_globs": true, "allow_network": true,
 	"allow_binaries": true, "require_os_isolation": true, "timeout_sec": true,
+	"max_processes": true, "max_memory_mb": true, "max_open_files": true,
+	"cpu_time_sec": true, "max_file_size_mb": true,
 }
 
 func LoadPolicy(path string) (*Policy, error) {

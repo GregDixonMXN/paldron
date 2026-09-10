@@ -184,6 +184,12 @@ func readonlyRuntimePaths(commandPath, invocationPath string) []string {
 	if _, err := os.Stat(filepath.Join(venvRoot, "pyvenv.cfg")); err == nil {
 		paths = append(paths, venvRoot)
 	}
+	// System Python's sitecustomize is a symlink into /etc/python<X.Y>,
+	// which is outside every other rule: without this the interpreter
+	// starts with a PermissionError on every invocation.
+	if matches, _ := filepath.Glob("/etc/python*"); matches != nil {
+		paths = append(paths, matches...)
+	}
 	// Do not grant the whole PATH, CARGO_HOME, or VIRTUAL_ENV: they may point at
 	// workspace-controlled files or unrelated credentials. The selected
 	// executable is granted explicitly, and a Python venv is discovered from

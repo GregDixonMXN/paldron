@@ -140,11 +140,11 @@ func runExec(p *Policy, argv []string) int {
 		AllowedBinaries:    p.AllowBinaries,
 		TimeoutSec:         intOr(p.TimeoutSec, 30),
 		MaxOutputBytes:     1024 * 1024,
-		CPUTimeSec:         10,
-		MaxMemoryBytes:     512 * 1024 * 1024,
-		MaxProcesses:       32,
-		MaxFileSizeBytes:   10 * 1024 * 1024,
-		MaxOpenFiles:       64,
+		CPUTimeSec:         intOr(p.CPUTimeSec, defaultCPUTimeSec),
+		MaxMemoryBytes:     int64(intOr(p.MaxMemoryMB, defaultMaxMemoryMB)) * 1024 * 1024,
+		MaxProcesses:       intOr(p.MaxProcesses, defaultMaxProcesses),
+		MaxFileSizeBytes:   int64(intOr(p.MaxFileSizeMB, defaultMaxFileSizeMB)) * 1024 * 1024,
+		MaxOpenFiles:       intOr(p.MaxOpenFiles, defaultMaxOpenFiles),
 	}
 	if p.RequireOSIsolation {
 		helperPath, helperErr := sandbox.IsolationHelperPath()

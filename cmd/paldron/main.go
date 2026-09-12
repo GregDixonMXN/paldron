@@ -81,6 +81,37 @@ func deny(msg string, args ...any) int {
 	return 2
 }
 
+// looksLikePath reports whether s should be treated as a filesystem path
+// for policy evaluation. Bare subcommands (cargo's "build", "test") and
+// other non-path tokens are never inside allow_paths, so feeding them to
+// EvalPath denies every real invocation. Only tokens with path shape
+// (absolute, separators, dot-prefix, file extension, embedded whitespace
+// such as sh -c script fragments, which fail closed) or naming an existing
+// entry under cwd are checked. Filesystem enforcement still happens in the
+// sandbox (Landlock), so a false allow here only loses a clean deny
+// message, while a false deny breaks the command entirely.
+func looksLikePath(cwd, s string) bool {
+	if filepath.IsAbs(s) || strings.HasPrefix(s, "~") {
+		return true
+	}
+	if strings.ContainsAny(s, `/\`) {
+		return true
+	}
+	if strings.ContainsAny(s, " 	\n\r") {
+		return true
+	}
+	if strings.HasPrefix(s, ".") {
+		return true
+	}
+	if filepath.Ext(s) != "" {
+		return true
+	}
+	if _, err := os.Stat(filepath.Join(cwd, s)); err == nil {
+		return true
+	}
+	return false
+}
+
 func runCheck(p *Policy, toolName, rawArgs string) int {
 	var args map[string]any
 	if err := json.Unmarshal([]byte(rawArgs), &args); err != nil {
@@ -101,6 +132,9 @@ func runCheck(p *Policy, toolName, rawArgs string) int {
 		s, ok := val.(string)
 		if !ok || s == "" || strings.HasPrefix(s, "-") {
 			continue // non-strings, empty, and flags are not paths
+		}
+		if !looksLikePath(cwd, s) {
+			continue // subcommands and other non-path tokens are not paths
 		}
 		if reason := p.EvalPath(cwd, s); reason != "" {
 			return deny("%s (%s)", s, reason)
@@ -126,6 +160,9 @@ func runExec(p *Policy, argv []string) int {
 	for _, a := range argv[1:] {
 		if a == "" || strings.HasPrefix(a, "-") {
 			continue // flags are not paths
+		}
+		if !looksLikePath(cwd, a) {
+			continue // subcommands and other non-path tokens are not paths
 		}
 		if reason := p.EvalPath(cwd, a); reason != "" {
 			return deny("%s (%s)", a, reason)

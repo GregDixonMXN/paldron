@@ -184,3 +184,39 @@ func TestExecProofs(t *testing.T) {
 	_ = os.Remove(".env")
 	_ = os.Remove("evil.py")
 }
+
+// P5: runtimes may use Unix-domain socketpair for local IPC under the
+// no-network policy (cargo -> rustc spawn needs it). socket() for real
+// network families stays denied by the seccomp filter.
+func TestExecUnixSocketpair(t *testing.T) {
+	chdirTemp(t, map[string]string{"src/sp.py": "import socket, threading\n" +
+		"a, b = socket.socketpair()\n" +
+		"a.send(b'ping')\n" +
+		"assert b.recv(4) == b'ping'\n" +
+		"done = []\n" +
+		"th = threading.Thread(target=lambda: done.append(True))\n" +
+		"th.start()\n" +
+		"th.join()\n" +
+		"assert done\n" +
+		"print('ipc ok')\n"})
+	p := testPolicy()
+	if got := runExec(p, []string{"python3", "src/sp.py"}); got != 0 {
+		t.Errorf("exec unix socketpair = %d, want 0", got)
+	}
+}
+
+// P6: the Unix-IPC allowance must not open real networking. Creating an
+// AF_INET socket under the no-network policy stays denied.
+func TestExecNetworkDenied(t *testing.T) {
+	chdirTemp(t, map[string]string{"src/nonet.py": "import socket\n" +
+		"try:\n" +
+		"    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n" +
+		"except PermissionError:\n" +
+		"    print('net denied ok')\n" +
+		"else:\n" +
+		"    raise SystemExit('network socket creation allowed!')\n"})
+	p := testPolicy()
+	if got := runExec(p, []string{"python3", "src/nonet.py"}); got != 0 {
+		t.Errorf("exec network denied proof = %d, want 0", got)
+	}
+}

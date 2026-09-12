@@ -403,20 +403,22 @@ func applySeccomp(allowNetwork bool) error {
 		blocked = append(blocked, uintptr(412)) // utimensat_time64
 	}
 	if !allowNetwork {
+		// NOTE: SYS_SOCKETPAIR is deliberately NOT blocked. It creates an
+		// already-connected Unix-domain pair and cannot open network
+		// connections, but runtimes need it for local IPC: Rust's process
+		// spawn (cargo -> rustc) fails with EPERM without it, as do
+		// Python multiprocessing and Node IPC.
+		// Likewise the data-transfer calls (send*/recv*) stay allowed: with
+		// socket/connect/bind/listen/accept denied, no new connection of
+		// any kind can be created, so these can only move bytes over
+		// already-connected Unix pairs. New connections stay impossible.
 		blocked = append(blocked,
 			unix.SYS_SOCKET,
-			unix.SYS_SOCKETPAIR,
 			unix.SYS_CONNECT,
 			unix.SYS_BIND,
 			unix.SYS_LISTEN,
 			unix.SYS_ACCEPT,
 			unix.SYS_ACCEPT4,
-			unix.SYS_SENDTO,
-			unix.SYS_SENDMSG,
-			unix.SYS_SENDMMSG,
-			unix.SYS_RECVFROM,
-			unix.SYS_RECVMSG,
-			unix.SYS_RECVMMSG,
 		)
 	}
 	filter := seccompErrnoFilter(blocked, auditArch)

@@ -12,12 +12,12 @@ No model, no chat, no cloud.
 | Platform | `check` (policy gate) | `exec` policy + output scan | OS isolation (Landlock/seccomp) |
 |---|---|---|---|
 | Linux x86_64 / arm64 | yes | yes | yes |
-| macOS arm64 / amd64 | yes | yes (`require_os_isolation = false`) | no — fails closed |
+| macOS arm64 / amd64 | yes | yes | partial (kernel: network + credential vaults; files: policy + scan) |
 | Windows amd64 | yes | yes (`require_os_isolation = false`) | no — fails closed |
 
-Requesting `require_os_isolation = true` off Linux exits 1 with a clear
-message instead of running unisolated. Degraded mode prints a warning to
-stderr on every run.
+Requesting `require_os_isolation = true` where no kernel backend exists
+(Windows) exits 1 with a clear message instead of running unisolated.
+Degraded mode prints a warning to stderr on every run.
 
 ## Install
 

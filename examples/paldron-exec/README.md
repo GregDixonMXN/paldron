@@ -22,3 +22,9 @@ binary whitelist, blocked patterns, and the post-run denied-file scan all
 enforce; Landlock/seccomp isolation does not exist on these platforms.
 Requesting `require_os_isolation = true` off Linux fails closed (exit 1)
 instead of running unisolated.
+
+macOS now has a Seatbelt backend: with `require_os_isolation = true` the
+kernel denies network egress (when the policy disables it) and denies
+access to ~/.ssh, ~/.aws, ~/.gnupg even if policy missed them. Workspace
+files stay policy gate + output scan. Verify on a Mac with
+`sh scripts/probe-mac.sh`.

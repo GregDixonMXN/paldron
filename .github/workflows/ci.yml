@@ -19,3 +19,7 @@ jobs:
       - run: go test -count=1 -race ./internal/paldron/ ./internal/schema/
       - run: go test -count=1 ./internal/sandbox/ ./cmd/paldron/
       - run: go build -o paldron ./cmd/paldron
+      # Portable exec must never regress: darwin (Seatbelt) and windows
+      # (gate-only) cross-compile from Linux.
+      - run: GOOS=darwin GOARCH=arm64 go build ./...
+      - run: GOOS=windows GOARCH=amd64 go build ./...

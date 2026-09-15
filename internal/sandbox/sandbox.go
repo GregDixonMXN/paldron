@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -295,9 +296,16 @@ func (s *Sandbox) executeParts(ctx context.Context, policyCommand string, parts 
 				MaxOpenFiles:     s.cfg.MaxOpenFiles,
 			},
 		}
-		cmd, err = newIsolatedCommand(execCtx, s.cfg.HelperPath, request)
-		if err != nil {
-			return &ExecuteResult{Error: err.Error()}
+		if runtime.GOOS == "darwin" {
+			cmd, err = newDarwinSandboxCommand(execCtx, tempHome, request)
+			if err != nil {
+				return &ExecuteResult{Error: err.Error()}
+			}
+		} else {
+			cmd, err = newIsolatedCommand(execCtx, s.cfg.HelperPath, request)
+			if err != nil {
+				return &ExecuteResult{Error: err.Error()}
+			}
 		}
 		commandEnv = withEnvironmentOverrides(commandEnv, map[string]string{
 			"HOME":                tempHome,

@@ -35,8 +35,9 @@ Versioned tarballs: `scripts/package.sh v0.1.0` (cross-targets via
 ## Quickstart (2 minutes)
 
 ```sh
-paldron exec --policy policy.toml -- python3 -c 'open(".env","w")'
-# paldron: deny: run produced .env (secret)   (exit 2, no model running)
+printf 'open(".env", "w").write("x=1\\n")\n' > src/leak.py
+paldron exec --policy policy.toml -- python3 src/leak.py
+# paldron: deny: run produced .env (policy deny_glob)   (exit 2, no model running)
 ```
 
 1. Copy `examples/paldron-exec/policy.toml` (Linux) or

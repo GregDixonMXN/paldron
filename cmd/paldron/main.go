@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -188,12 +189,14 @@ func runExec(p *Policy, argv []string) int {
 		isolationErr := sandbox.IsolationSupported(p.AllowNetwork)
 		switch {
 		case helperErr != nil:
-			return fail("OS isolation unavailable (helper): %v", helperErr)
+			return fail("OS isolation unavailable on %s (helper): %v. Set require_os_isolation=false for policy-gate-only mode (no kernel boundary).", runtime.GOOS, helperErr)
 		case isolationErr != nil:
-			return fail("OS isolation unavailable: %v", isolationErr)
+			return fail("OS isolation unavailable on %s: %v. Set require_os_isolation=false for policy-gate-only mode (no kernel boundary).", runtime.GOOS, isolationErr)
 		default:
 			cfg.HelperPath = helperPath
 		}
+	} else {
+		fmt.Fprintln(os.Stderr, "paldron: warning: running without OS isolation (policy gate + output scan only, no kernel boundary)")
 	}
 	sb := sandbox.NewSandbox(cfg)
 	if p.RequireOSIsolation && !sb.HasOSIsolation() {

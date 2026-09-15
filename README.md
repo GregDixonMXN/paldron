@@ -5,12 +5,45 @@ invoked by coding agents. Exits 0 allow, 2 deny, 1 broken (same numbers as
 `annalist gate`: Annalist records what happened, Paldron decides whether it
 may run).
 
-Linux only. No model, no chat, no cloud.
+No model, no chat, no cloud.
+
+## Platform support
+
+| Platform | `check` (policy gate) | `exec` policy + output scan | OS isolation (Landlock/seccomp) |
+|---|---|---|---|
+| Linux x86_64 / arm64 | yes | yes | yes |
+| macOS arm64 / amd64 | yes | yes (`require_os_isolation = false`) | no — fails closed |
+| Windows amd64 | yes | yes (`require_os_isolation = false`) | no — fails closed |
+
+Requesting `require_os_isolation = true` off Linux exits 1 with a clear
+message instead of running unisolated. Degraded mode prints a warning to
+stderr on every run.
+
+## Install
+
+Requires Go 1.24+ to build from source:
+
+```sh
+go install github.com/GregDixonMXN/paldron/cmd/paldron@latest
+# or
+git clone https://github.com/GregDixonMXN/paldron && cd paldron && go build -o paldron ./cmd/paldron
+```
+
+Versioned tarballs: `scripts/package.sh v0.1.0` (cross-targets via
+`GOOS`/`GOARCH`, e.g. `GOOS=darwin GOARCH=arm64 scripts/package.sh v0.1.0`).
+
+## Quickstart (2 minutes)
 
 ```sh
 paldron exec --policy policy.toml -- python3 -c 'open(".env","w")'
 # paldron: deny: run produced .env (secret)   (exit 2, no model running)
 ```
+
+1. Copy `examples/paldron-exec/policy.toml` (Linux) or
+   `examples/paldron-exec/policy.mac.toml` (Mac/Windows).
+2. Run your agent command behind it:
+   `paldron exec --policy policy.toml -- <command>`.
+3. Try to exfiltrate or write a secret — expect exit 2 with a reason.
 
 ## Policy
 
@@ -32,8 +65,9 @@ max_file_size_mb = 1024 # default 1024
 
 Secrets are denied even with no policy file. Unknown keys are an error.
 `exec` gates argv, runs the command behind Landlock/seccomp/resource
-limits, then flips a successful run to deny if it produced a denied file
-(argv gating cannot see runtime writes). Flags are not paths.
+limits (Linux; policy gate + output scan elsewhere), then flips a
+successful run to deny if it produced a denied file (argv gating cannot
+see runtime writes). Flags are not paths.
 
 ## Commands
 
@@ -43,8 +77,11 @@ paldron exec  --policy policy.toml -- python3 src/tool.py
 paldron schema --tool execute_code
 ```
 
+See `examples/paldron-exec/` for the composed fixture, including the
+Mac/Windows policy.
+
 ## Build
 
-Requires Go 1.24+. `go test -race ./...`. Extracted from Reeve's
+Requires Go 1.24+. `go test ./...`. Extracted from Reeve's
 guardrail + sandbox (see reeve/docs/cut.md); the registry, models,
 memory, and desktop stayed behind.

@@ -1,0 +1,9 @@
+allow_paths = ["src/"]
+deny_globs = [".env", ".env.*", "*.pem", "**/secrets/**"]
+allow_network = false
+allow_binaries = ["python3"]
+# Mac / Windows fast pass: no kernel boundary on these platforms yet.
+# Enforcement is policy gate + post-run output scan. Full OS isolation
+# (Landlock/seccomp) requires Linux with require_os_isolation = true.
+require_os_isolation = false
+timeout_sec = 30

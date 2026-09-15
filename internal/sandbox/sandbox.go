@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -328,17 +327,9 @@ func (s *Sandbox) executeParts(ctx context.Context, policyCommand string, parts 
 	cmd.Env = commandEnv
 
 	// Set process group so we can kill the entire tree on timeout
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error {
-		if cmd.Process == nil {
-			return os.ErrProcessDone
-		}
-		err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		if err == syscall.ESRCH {
-			return os.ErrProcessDone
-		}
-		return err
-	}
+	// (platform-specific: full group kill on Unix, direct child on Windows).
+	setProcessGroup(cmd)
+	cmd.Cancel = cancelProcessTree(cmd)
 	cmd.WaitDelay = 2 * time.Second
 
 	// Capture output without ever retaining more than the configured cap.
@@ -364,9 +355,7 @@ func (s *Sandbox) executeParts(ctx context.Context, policyCommand string, parts 
 
 		// CommandContext invokes the process-group cancellation above. Repeat it
 		// after Wait as a best-effort cleanup for a child that raced the timeout.
-		if cmd.Process != nil {
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		}
+		killProcessTree(cmd)
 	} else if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			result.ExitCode = exitErr.ExitCode()

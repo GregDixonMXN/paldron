@@ -11,7 +11,8 @@ No model, no chat, no cloud.
 
 | Platform | `check` (policy gate) | `exec` policy + output scan | OS isolation (Landlock/seccomp) |
 |---|---|---|---|
-| Linux x86_64 / arm64 | yes | yes | yes |
+| Linux x86_64 | yes | yes | yes |
+| Linux arm64 | yes | yes | builds; kernel isolation untested on arm64 |
 | macOS arm64 / amd64 | yes | yes | partial (kernel: network + credential vaults; files: policy + scan) |
 | Windows amd64 | yes | yes (`require_os_isolation = false`) | no — fails closed |
 
@@ -21,7 +22,9 @@ Degraded mode prints a warning to stderr on every run.
 
 ## Install
 
-Requires Go 1.24+ to build from source:
+Prebuilt tarballs for Linux, macOS, and Windows are on the
+[releases page](https://github.com/GregDixonMXN/paldron/releases).
+Or build from source (requires Go 1.24+):
 
 ```sh
 go install github.com/GregDixonMXN/paldron/cmd/paldron@latest
@@ -29,8 +32,8 @@ go install github.com/GregDixonMXN/paldron/cmd/paldron@latest
 git clone https://github.com/GregDixonMXN/paldron && cd paldron && go build -o paldron ./cmd/paldron
 ```
 
-Versioned tarballs: `scripts/package.sh v0.1.0` (cross-targets via
-`GOOS`/`GOARCH`, e.g. `GOOS=darwin GOARCH=arm64 scripts/package.sh v0.1.0`).
+Versioned tarballs: `scripts/package.sh v0.2.0` (cross-targets via
+`GOOS`/`GOARCH`, e.g. `GOOS=darwin GOARCH=arm64 scripts/package.sh v0.2.0`).
 
 ## Quickstart (2 minutes)
 

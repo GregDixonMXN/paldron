@@ -27,6 +27,11 @@ type Policy struct {
 	MaxOpenFiles  int `toml:"max_open_files"`
 	CPUTimeSec    int `toml:"cpu_time_sec"`
 	MaxFileSizeMB int `toml:"max_file_size_mb"`
+	// Jev output verdict (opt-in cloud judgment over captured stdout/stderr,
+	// after the deterministic file scan passes). Key from JEV_API_KEY.
+	JevVerdict   bool    `toml:"jev_verdict"`
+	JevThreshold float64 `toml:"jev_threshold"` // 0 = default 0.7
+	JevOnError   string  `toml:"jev_on_error"`  // "deny" (default) or "allow"
 }
 
 // Compiled resource defaults. Deliberately roomy: the sandbox's job is
@@ -52,6 +57,7 @@ var knownPolicyKeys = map[string]bool{
 	"allow_binaries": true, "require_os_isolation": true, "timeout_sec": true,
 	"max_processes": true, "max_memory_mb": true, "max_open_files": true,
 	"cpu_time_sec": true, "max_file_size_mb": true,
+	"jev_verdict": true, "jev_threshold": true, "jev_on_error": true,
 }
 
 func LoadPolicy(path string) (*Policy, error) {
@@ -72,6 +78,14 @@ func LoadPolicy(path string) (*Policy, error) {
 	p := DefaultPolicy()
 	if err := toml.Unmarshal(data, p); err != nil {
 		return nil, fmt.Errorf("policy malformed: %w", err)
+	}
+	switch p.JevOnError {
+	case "", "deny", "allow":
+	default:
+		return nil, fmt.Errorf("policy jev_on_error must be \"deny\" or \"allow\"")
+	}
+	if p.JevThreshold < 0 || p.JevThreshold > 1 {
+		return nil, fmt.Errorf("policy jev_threshold must be between 0 and 1")
 	}
 	return p, nil
 }

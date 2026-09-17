@@ -84,6 +84,23 @@ paldron schema --tool execute_code
 See `examples/paldron-exec/` for the composed fixture, including the
 Mac/Windows policy.
 
+## Jev output verdict (opt-in)
+
+The file scan never sees stdout: a run that prints secrets (`env`,
+`cat .env`) passes it silently. With `jev_verdict = true`, a successful
+run's captured output gets one semantic judgment (secret exposure +
+hostile action, calibrated probabilities) before the allow:
+
+```toml
+jev_verdict = true
+jev_threshold = 0.7   # deny at or above this probability (default 0.7)
+jev_on_error = "deny" # "deny" (default, fail closed) or "allow"
+```
+
+Key from `JEV_API_KEY`. No key with `jev_verdict` set fails closed
+(unless `jev_on_error = "allow"`). Unset entirely and nothing calls out —
+Paldron stays model-free, no cloud, as before.
+
 ## Build
 
 Requires Go 1.24+. `go test ./...`. Extracted from Reeve's

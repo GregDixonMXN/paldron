@@ -21,7 +21,10 @@ import (
 	"time"
 
 	"github.com/GregDixonMXN/paldron/internal/paldron"
+
+	"github.com/GregDixonMXN/paldron/internal/jev"
 	"github.com/GregDixonMXN/paldron/internal/sandbox"
+
 	"github.com/GregDixonMXN/paldron/internal/schema"
 )
 
@@ -222,7 +225,46 @@ func runExec(p *Policy, argv []string) int {
 	if hit := scanOutputs(cwd, p, start); hit != "" {
 		return deny("run produced %s", hit)
 	}
+	// Optional Jev output verdict: the file scan never sees stdout, so a run
+	// that prints secrets (cat .env, env dumps) passes it silently. When
+	// jev_verdict is set, captured output gets a semantic judgment too.
+	if reason := jevOutputVerdict(p, argv, res); reason != "" {
+		return deny("%s", reason)
+	}
 	return 0
+}
+
+// jevOutputVerdict judges captured run output for secret exposure and
+// hostile action. Returns "" when the verdict is disabled or passes.
+// Opt-in only: without jev_verdict (or without a key) nothing calls out.
+func jevOutputVerdict(p *Policy, argv []string, res *sandbox.ExecuteResult) string {
+	if !p.JevVerdict {
+		return ""
+	}
+	v, err := jev.JudgeOutput(jev.RunContext{
+		Argv:     argv,
+		ExitCode: res.ExitCode,
+		Stdout:   res.Stdout,
+		Stderr:   res.Stderr,
+	})
+	if err != nil {
+		if strings.EqualFold(p.JevOnError, "allow") {
+			fmt.Fprintf(os.Stderr, "paldron: warning: jev verdict unavailable, allowing run (jev_on_error=allow): %v\n", err)
+			return ""
+		}
+		return fmt.Sprintf("jev verdict unavailable: %v", err)
+	}
+	threshold := p.JevThreshold
+	if threshold <= 0 {
+		threshold = 0.7
+	}
+	if v.SecretExposure >= threshold {
+		return fmt.Sprintf("jev verdict: output exposes secrets (p=%.2f)", v.SecretExposure)
+	}
+	if v.HostileAction >= threshold {
+		return fmt.Sprintf("jev verdict: output shows hostile action (p=%.2f)", v.HostileAction)
+	}
+	return ""
 }
 
 // scanOutputs returns the first deny/secret-glob file under root modified

@@ -4,3 +4,8 @@ allow_network = false
 allow_binaries = ["python3"]
 require_os_isolation = true
 timeout_sec = 30
+
+# Optional: semantic verdict over captured stdout/stderr (needs JEV_API_KEY).
+# jev_verdict = true
+# jev_threshold = 0.7
+# jev_on_error = "deny"
